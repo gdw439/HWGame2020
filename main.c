@@ -54,7 +54,6 @@ inline int height(struct node* root){
  	return root->height;
 }
 
-
 inline int Balance(struct node* root){
 	if(root==NULL)
 		return 0;
@@ -108,10 +107,6 @@ void FindLoop(struct node* root, struct loop *list, struct loop find){
 			}
 			pp->next = copy;
 			CNT++;
-			//debug
-			// for(int i=0; i<copy->height; i++)
-			// 	printf("%d", copy->nodes[i]);
-			// printf("\n");
 		}
 		return;
 	}
@@ -141,30 +136,27 @@ void inorder(struct node* root, struct loop *list){
 	// 查找当前节点的环路
 	struct loop find = {{0,0,0,0,0,0,0}, 0, NULL};
 	FindLoop(root, list, find);
-	// printf("%d---",root->id);
-	// struct path * point = root->next;
-	// while(point != NULL){
-	// 	printf("%d ", point->curr->id);
-	// 	point = point->next;
-	// }
-	// printf("\n");
 
 	inorder(root->right, list);
 }
 
 
-struct node* Insert(struct node* root, int id){
-	if(root==NULL)
-		return NewNode(id);
+struct node* Insert(struct node* root, int id, struct node** seek){
+	if(root==NULL){
+		*seek = NewNode(id);
+		return *seek;
+	}
 
-	if(id < root->id)
-		root->left = Insert(root->left, id);
+	if(id < root->id){
+		root->left = Insert(root->left, id, seek);
 
-	else if(id > root->id)
-		root->right = Insert(root->right, id);
+	} else if(id > root->id){
+		root->right = Insert(root->right, id, seek);
 
-	else
+	} else {
+		*seek = root;
 		return root;
+	}
 
 	root->height = max(height(root->left), height(root->right))+1;
 
@@ -194,23 +186,6 @@ struct node* Insert(struct node* root, int id){
 }
 
 
-inline struct node* Exist(struct node* root, int id){
-	if (root == NULL){
-		return NULL;
-	}
-	
-	if (root->id == id){
-		return root;
-	}
-	else if (id < root->id)	{
-		return Exist(root->left, id);
-	} 
-	else {
-		return Exist(root->right, id);
-	}
-}
-
-
 struct node* Build(char * filename){
     int a, b, c;
 	FILE *fp = NULL;
@@ -218,17 +193,9 @@ struct node* Build(char * filename){
     
     fp = fopen(filename, "r");
     while(fscanf(fp, "%d,%d,%d", &a, &b, &c) != EOF){
-		struct node* A = Exist(root, a);
-    	if(A==NULL){
-			root = Insert(root, a);
-			A = Exist(root, a);
-		}
-
-		struct node* B = Exist(root, b);
-		if(B==NULL){
-			root = Insert(root, b);
-			B = Exist(root, b);
-		}
+		struct node *A = NULL, *B = NULL;
+		root = Insert(root, a, &A);
+		root = Insert(root, b, &B);
 
 		struct path* curr = (struct path*)malloc(sizeof(struct path));
 		curr->curr = B;
@@ -273,10 +240,6 @@ void Save(char * filename, struct loop* list){
 			cnt++;
 		}
 	}
-	// fseek(fp, 0L, SEEK_SET);
-	// fseek(fp,0, SEEK_SET);
-	// fprintf(fp, "%d\n", cnt);
-
     fclose(fp);  
 }
 
