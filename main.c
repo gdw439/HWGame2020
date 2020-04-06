@@ -3,8 +3,14 @@
 #include<string.h>
 #include<time.h>
 
-// 唯一的全局变量，统计循环转账数目
-int CNT = 0;
+#define DeBug 1
+
+#ifdef DeBug
+	int PAD = 0;	// 统计节点数目
+	int num = 0;
+#endif
+
+int CNT = 0;	// 统计循环转账数目
 
 struct node;
 struct path;
@@ -30,10 +36,24 @@ struct loop{
 	int height;
 	struct loop* next;
 };
+// 保存环的链表
+struct list{
+	struct loop* head;
+	struct loop* tail;
+};
 
 
 inline struct node* NewNode(int id){
 	struct node* temp = (struct node*)malloc(sizeof(struct node));
+	if(temp==NULL){
+		printf("No Vaild Memory\n");
+		return NULL;
+	}
+
+#ifdef DeBug
+	PAD++;
+#endif
+
 	temp->id = id;
 	temp->left = NULL;
 	temp->right = NULL;
@@ -42,8 +62,25 @@ inline struct node* NewNode(int id){
 	return temp;
 }
 
+inline struct loop* NewLoop(struct loop root){
+	struct loop *copy = malloc(sizeof(struct loop));
+	if(copy==NULL){
+		printf("No Vaild Memory\n");
+		return NULL;
+	}
+	memcpy(copy, &root, sizeof(root));
+	return copy;
+}
+
+inline void initlists(struct list *lists){
+	for(int i=0; i<8; i++){
+		lists[i].head = NULL;
+		lists[i].tail = NULL;
+	}
+}
+
 // 内联函数，提升速度
-inline int max(int a,int b){
+inline int max(int a, int b){
  	return (a >b ) ? a : b;
 }
 
@@ -68,8 +105,8 @@ inline struct node* LeftRotate(struct node* z){
 	y->left = z;
 	z->right = t2;
 
-	z->height = max(height(z->left),height(z->right))+1;
-	y->height = max(height(y->left),height(y->right))+1;
+	z->height = max(height(z->left), height(z->right)) + 1;
+	y->height = max(height(y->left), height(y->right)) + 1;
 
 	return y;
 }
@@ -88,7 +125,7 @@ inline struct node * RightRotate(struct node* z){
 	return y;
 }
 
-void FindLoop(struct node* root, struct loop *list, struct loop find){
+void FindLoop(struct node* root, struct list *lists, struct loop find){
 	// 环超过既定长度, 环返回到前边搜索过的节点， 退出
 	if(find.height > 7 || root->id < find.nodes[0]){
 		return;
@@ -98,15 +135,19 @@ void FindLoop(struct node* root, struct loop *list, struct loop find){
 		// 环太小，退出
 		if(find.height >= 3){
 			// 拷贝一份环
-			struct loop *copy = malloc(sizeof(struct loop));
-			memcpy(copy, &find, sizeof(find));
-
-			struct loop *pp = &(list[find.height]);
-			while(pp->next != NULL){
-				pp = pp->next;
+			struct loop *copy = NewLoop(find);
+			if(lists[find.height].tail==NULL){
+				// 环列表节点为空，初始化
+				lists[find.height].tail = copy;
+				lists[find.height].head = copy;
+			} else {
+				// 环列表非空，更新
+				lists[find.height].head->next = copy;
+				lists[find.height].head = copy;
 			}
-			pp->next = copy;
 			CNT++;
+			// if(CNT%1000==0)
+			// 	printf("current loop: %d\n", CNT);
 		}
 		return;
 	}
@@ -121,23 +162,24 @@ void FindLoop(struct node* root, struct loop *list, struct loop find){
 	find.height++;
 	struct path *pp = root->next;
 	while(pp != NULL){
-		FindLoop(pp->curr, list, find);
+		FindLoop(pp->curr, lists, find);
 		pp = pp->next;
 	}
 }
 
 // 中序遍历
-void inorder(struct node* root, struct loop *list){
+void inorder(struct node* root, struct list *lists){
 	if(root==NULL)
 		return;
 
-    inorder(root->left, list);
+    inorder(root->left, lists);
 	
 	// 查找当前节点的环路
 	struct loop find = {{0,0,0,0,0,0,0}, 0, NULL};
-	FindLoop(root, list, find);
+	FindLoop(root, lists, find);
+	// printf("%d\n", num++);
 
-	inorder(root->right, list);
+	inorder(root->right, lists);
 }
 
 
@@ -211,9 +253,8 @@ struct node* Build(char * filename){
 			}else{
 				while(point->next != NULL && point->next->curr->id < B->id)
 					point = point->next;
-				struct path *tmp = point->next;
+				curr->next = point->next;
 				point->next = curr;
-				curr->next = tmp;
 			}
 		}		
 	}
@@ -222,7 +263,7 @@ struct node* Build(char * filename){
 }
 
 
-void Save(char * filename, struct loop* list){
+void Save(char * filename, struct list* lists){
     int cnt = 0;
 	FILE *fp = NULL;
     fp = fopen(filename, "w");
@@ -230,7 +271,7 @@ void Save(char * filename, struct loop* list){
 	fprintf(fp, "%d\n", CNT);
 	
 	for(int i=3; i<8; i++){
-		struct loop *pp = list[i].next;
+		struct loop *pp = lists[i].tail;
 		while(pp != NULL){
 			fprintf(fp, "%d", pp->nodes[0]);
 			for(int j=1; j<pp->height; j++)
@@ -252,26 +293,24 @@ int main(void){
 	char readfile[] = "test_data.txt";
 	char writefile[] = "demo.txt";
 
-	struct loop list[8] = {
-		{{0,0,0,0,0,0,0}, 0, NULL},
-		{{0,0,0,0,0,0,0}, 0, NULL},
-		{{0,0,0,0,0,0,0}, 0, NULL},
-		{{0,0,0,0,0,0,0}, 0, NULL},
-		{{0,0,0,0,0,0,0}, 0, NULL},
-		{{0,0,0,0,0,0,0}, 0, NULL},
-		{{0,0,0,0,0,0,0}, 0, NULL},
-		{{0,0,0,0,0,0,0}, 0, NULL}
-	};	// 0~2没有用到 
+	// 数组指针
+	struct list lists[8]; 
 
 	struct node* root = Build(readfile);
 
-	// 网络建立时间
-	finish = clock();
-	Total_time = (double)(finish - start) / CLOCKS_PER_SEC;
-	printf("\nBuild Time: %lf seconds\n", Total_time);
+#ifdef DeBug
+	printf("Node num : %d\n", PAD);
+	printf("AVL height : %d\n", root->height);
+#endif
 
-	inorder(root, list);
-	Save(writefile, list);
+	// 网络建立时间
+	// finish = clock();
+	// Total_time = (double)(finish - start) / CLOCKS_PER_SEC;
+	// printf("\nBuild Time: %lf seconds\n", Total_time);
+	
+	initlists(lists);
+	inorder(root, lists);
+	Save(writefile, lists);
 
 	// 总时间
 	finish = clock();
