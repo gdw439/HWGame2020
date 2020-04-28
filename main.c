@@ -24,7 +24,8 @@ struct path{
 // 平衡二叉树的节点
 struct node{
     unsigned int id;
-    unsigned int height;
+    unsigned short height;
+	unsigned short isfork;
     struct node *left;
     struct node *right;
     struct path *next;
@@ -59,16 +60,17 @@ inline struct node* NewNode(int id){
 	temp->right = NULL;
 	temp->height = 1;
 	temp->next = NULL;
+	temp->isfork = 0;
 	return temp;
 }
 
-inline struct loop* NewLoop(struct loop root){
+inline struct loop* NewLoop(struct loop *root){
 	struct loop *copy = malloc(sizeof(struct loop));
 	if(copy==NULL){
 		printf("No Vaild Memory\n");
 		return NULL;
 	}
-	memcpy(copy, &root, sizeof(root));
+	memcpy(copy, root, sizeof(struct loop));
 	return copy;
 }
 
@@ -125,45 +127,48 @@ inline struct node * RightRotate(struct node* z){
 	return y;
 }
 
-void FindLoop(struct node* root, struct list *lists, struct loop find){
+void FindLoop(struct node* root, struct list *lists, struct loop *find){
 	// 环超过既定长度, 环返回到前边搜索过的节点， 退出
-	if(find.height > 7 || root->id < find.nodes[0]){
+	if(find->height > 7 || root->id < find->nodes[0]){
 		return;
 	}
-		
-	if(root->id == find.nodes[0] && find.height > 0){
-		// 环太小，退出
-		if(find.height >= 3){
-			// 拷贝一份环
-			struct loop *copy = NewLoop(find);
-			if(lists[find.height].tail==NULL){
-				// 环列表节点为空，初始化
-				lists[find.height].tail = copy;
-				lists[find.height].head = copy;
-			} else {
-				// 环列表非空，更新
-				lists[find.height].head->next = copy;
-				lists[find.height].head = copy;
-			}
-			CNT++;
-			// if(CNT%1000==0)
-			// 	printf("current loop: %d\n", CNT);
-		}
-		return;
-	}
-	
-	// 避免子环，可以优化查找的位置
-	for(int i=0; i<find.height; i++){
-		if(find.nodes[i]==root->id)
+	if(root->isfork){
+		if(root->id != find->nodes[0])
 			return;
-	}
-	// 加入环
-	find.nodes[find.height] = root->id;
-	find.height++;
-	struct path *pp = root->next;
-	while(pp != NULL){
-		FindLoop(pp->curr, lists, find);
-		pp = pp->next;
+		else {
+			// 环太小，退出
+			if(find->height >= 3){
+				// 拷贝一份环
+				struct loop *copy = NewLoop(find);
+				if(lists[find->height].tail==NULL){
+					// 环列表节点为空，初始化
+					lists[find->height].tail = copy;
+					lists[find->height].head = copy;
+				} else {
+					// 环列表非空，更新
+					lists[find->height].head->next = copy;
+					lists[find->height].head = copy;
+				}
+				if(CNT%1000==0)
+					printf("current loop: %d\n", CNT);
+				CNT++;
+			}
+			return;
+		}
+	} else {
+		// 访问占用
+		root->isfork = 1;
+		// 加入环
+		find->nodes[find->height] = root->id;
+		find->height++;
+		struct path *pp = root->next;
+		while(pp != NULL){
+			FindLoop(pp->curr, lists, find);
+			pp = pp->next;
+		}
+		// 取消访问占用
+		root->isfork = 0;
+		find->height--;
 	}
 }
 
@@ -173,11 +178,11 @@ void inorder(struct node* root, struct list *lists){
 		return;
 
     inorder(root->left, lists);
-	
+	printf("%d\n", num++);
 	// 查找当前节点的环路
-	struct loop find = {{0,0,0,0,0,0,0}, 0, NULL};
+	struct loop *find =NULL, tmp = {{0,0,0,0,0,0,0}, 0, NULL};
+	find = &tmp;
 	FindLoop(root, lists, find);
-	// printf("%d\n", num++);
 
 	inorder(root->right, lists);
 }
@@ -290,8 +295,9 @@ int main(void){
 	double Total_time;
 	start = clock();
 
-	char readfile[] = "test_data.txt";
-	char writefile[] = "demo.txt";
+	char readfile[] = "/data/test_data.txt";
+	// char readfile[] = "test.txt";
+	char writefile[] = "/projects/student/result.txt";
 
 	// 数组指针
 	struct list lists[8]; 
